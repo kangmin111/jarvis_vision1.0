@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>J.A.R.V.I.S. VISION - AI 비전 비서</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Pretendard', -apple-system, sans-serif; }
+    body, html { width: 100%; height: 100%; background: #000; overflow: hidden; color: #00f3ff; }
+
+    /* 전체 화면 카메라 피드 (글씨가 뒤집히지 않게 항상 정방향 유지) */
+    #camera-feed {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(1);
+      z-index: 1;
+    }
+
+    /* 스캔 격자 오버레이 */
+    .hud-grid {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at center, transparent 35%, rgba(0, 15, 25, 0.65) 100%);
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* 상단 상태바 */
+    .top-bar {
+      position: fixed;
+      top: 14px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+    }
+    .badge {
+      background: rgba(0, 20, 35, 0.75);
+      border: 1px solid rgba(0, 243, 255, 0.5);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      backdrop-filter: blur(6px);
+    }
+    .top-btns { display: flex; gap: 8px; }
+    .icon-btn {
+      background: rgba(0, 20, 35, 0.8);
+      border: 1px solid #00f3ff;
+      color: #00f3ff;
+      padding: 6px 12px;
+      border-radius: 16px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    /* 중앙 자비스 아크 리액터 조준점 */
+    .reticle-wrap {
+      position: fixed;
+      top: 44%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 210px;
+      height: 210px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 5;
+    }
+    .ring-outer {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border: 2px dashed rgba(0, 243, 255, 0.65);
+      border-radius: 50%;
+      animation: spin 14s linear infinite;
+    }
+    .ring-inner {
+      position: absolute;
+      width: 135px;
+      height: 135px;
+      border: 3px solid rgba(0, 243, 255, 0.85);
+      border-top-color: transparent;
+      border-bottom-color: transparent;
+      border-radius: 50%;
+      animation: spin-rev 4s linear infinite;
+    }
+    .core-dot {
+      width: 14px;
+      height: 14px;
+      background: rgba(0, 243, 255, 0.9);
+      border-radius: 50%;
+      box-shadow: 0 0 18px #00f3ff, 0 0 35px #00f3ff;
+    }
+    .reticle-wrap.scanning .ring-outer {
+      border-color: #ffae00;
+      animation-duration: 2s;
+    }
+    .reticle-wrap.scanning .core-dot {
+      background: #ffae00;
+      box-shadow: 0 0 24px #ffae00;
+    }
+
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    @keyframes spin-rev { 100% { transform: rotate(-360deg); } }
+
+    /* 자비스 대답 자막 박스 */
+    .subtitle-box {
+      position: fixed;
+      bottom: 135px;
+      left: 16px;
+      right: 16px;
+      max-height: 28vh;
+      overflow-y: auto;
+      background: rgba(0, 18, 30, 0.82);
+      border: 1px solid rgba(0, 243, 255, 0.55);
+      border-radius: 14px;
+      padding: 12px 16px;
+      font-size: 15px;
+      line-height: 1.5;
+      color: #e6fcff;
+      backdrop-filter: blur(8px);
+      z-index: 10;
+    }
+
+    /* 하단 컨트롤 바 */
+    .bottom-controls {
+      position: fixed;
+      bottom: 18px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 10;
+    }
+    .input-row {
+      display: flex;
+      gap: 8px;
+    }
+    #question-input {
+      flex: 1;
+      background: rgba(0, 20, 35, 0.85);
+      border: 1px solid rgba(0, 243, 255, 0.6);
+      border-radius: 22px;
+      padding: 10px 16px;
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+    }
+    .action-row {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+    }
+    .btn-main {
+      flex: 1;
+      padding: 12px;
+      border-radius: 24px;
+      border: 1px solid #00f3ff;
+      background: rgba(0, 243, 255, 0.18);
+      color: #00f3ff;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      backdrop-filter: blur(6px);
+    }
+    .btn-main.listening {
+      background: rgba(255, 60, 60, 0.35);
+      border-color: #ff4d4d;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <video id="camera-feed" autoplay playsinline muted></video>
+  <canvas id="capture-canvas" style="display:none;"></canvas>
+  <div class="hud-grid"></div>
+
+  <div class="top-bar">
+    <div class="badge" id="status-badge">VISION ONLINE</div>
+    <div class="top-btns">
+      <button class="icon-btn" id="mute-btn">🔊 음성 ON</button>
+      <button class="icon-btn" id="switch-cam-btn">🔄 카메라 전환</button>
+    </div>
+  </div>
+
+  <div class="reticle-wrap" id="reticle">
+    <div class="ring-outer"></div>
+    <div class="ring-inner"></div>
+    <div class="core-dot"></div>
+  </div>
+
+  <div class="subtitle-box" id="subtitle-box">
+    J.A.R.V.I.S. VISION 가동 완료. 사물이나 수학 문제를 비추고 물어봐!
+  </div>
+
+  <div class="bottom-controls">
+    <div class="input-row">
+      <input type="text" id="question-input" placeholder="질문 입력 (예: 이거 뭐야? / 이 수학 문제 풀어줘)">
+      <button class="icon-btn" id="send-btn">스캔 전송</button>
+    </div>
+    <div class="action-row">
+      <button class="btn-main" id="mic-btn">🎙️ 말로 물어보기</button>
+      <button class="btn-main" id="quick-scan-btn">👁️ 지금 보이는 거 분석</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
