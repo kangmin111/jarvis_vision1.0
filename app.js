@@ -92,7 +92,7 @@ async function analyzeVision(promptText) {
   subtitleBox.textContent = `분석 중: "${promptText}"`;
 
   try {
-    const res = await fetch("/.netlify/functions/vision", {
+    const res = await fetch("/api/vision", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ imageBase64, prompt: promptText }),
@@ -123,7 +123,7 @@ async function speakReelsVoice(text) {
     if (currentAudio) {
       currentAudio.pause();
     }
-    const res = await fetch("/.netlify/functions/tts", {
+    const res = await fetch("/api/tts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
